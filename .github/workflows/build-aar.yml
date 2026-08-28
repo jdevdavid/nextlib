@@ -43,16 +43,17 @@ jobs:
       - name: Patch enabled FFmpeg decoders + ARM-only ABIs
         run: |
           set -euxo pipefail
-          sed -i 's|^ENABLED_DECODERS=.*|ENABLED_DECODERS="vorbis opus flac alac pcm_mulaw pcm_alaw mp3 amrnb amrwb aac ac3 eac3 dca mlp truehd wmav1 wmav2 wmapro h264 hevc mpeg2video mpegvideo mpeg4 msmpeg4v1 msmpeg4v2 msmpeg4v3 h263 h263p h263i vc1 wmv1 wmv2 wmv3 flv1 vp6 vp6a vp6f svq1 svq3 cinepak rv10 rv20 rv30 rv40 libvpx_vp8 libvpx_vp9"|' ffmpeg/setup.sh
+          sed -i 's|^ENABLED_DECODERS=.*|ENABLED_DECODERS="vorbis opus flac alac pcm_mulaw pcm_alaw mp1 mp2 mp3 amrnb amrwb aac ac3 eac3 dca mlp truehd wmav1 wmav2 wmapro h264 hevc mpeg2video mpegvideo mpeg4 msmpeg4v1 msmpeg4v2 msmpeg4v3 h263 h263p h263i vc1 wmv1 wmv2 wmv3 flv1 vp6 vp6a vp6f svq1 svq3 cinepak rv10 rv20 rv30 rv40 libvpx_vp8 libvpx_vp9"|' ffmpeg/setup.sh
           sed -i 's|^ANDROID_ABIS=.*|ANDROID_ABIS="armeabi-v7a arm64-v8a"|' ffmpeg/setup.sh
           sed -i 's|abiFilters += listOf("x86", "x86_64", "armeabi-v7a", "arm64-v8a")|abiFilters += listOf("armeabi-v7a", "arm64-v8a")|' media3ext/build.gradle.kts
 
-      - name: Patch MIME to decoder whitelist (add mp4v/h263/vc1)
+      - name: Patch MIME to decoder whitelist (video mp4v/h263/vc1 + audio mp1/mp2)
         run: |
           set -euxo pipefail
           f=media3ext/src/main/java/io/github/anilbeesetti/nextlib/media3ext/ffdecoder/FfmpegLibrary.java
           perl -0777 -i -pe 's/(case MimeTypes\.VIDEO_H264 -> "h264";)/$1\n      case MimeTypes.VIDEO_MP4V -> "mpeg4";\n      case MimeTypes.VIDEO_H263 -> "h263";\n      case MimeTypes.VIDEO_VC1 -> "vc1";/' "$f"
-          grep -n 'VIDEO_' "$f"
+          perl -0777 -i -pe 's/case MimeTypes\.AUDIO_MPEG, MimeTypes\.AUDIO_MPEG_L1, MimeTypes\.AUDIO_MPEG_L2 -> "mp3";/case MimeTypes.AUDIO_MPEG -> "mp3";\n      case MimeTypes.AUDIO_MPEG_L1 -> "mp1";\n      case MimeTypes.AUDIO_MPEG_L2 -> "mp2";/' "$f"
+          grep -nE 'VIDEO_|AUDIO_MPEG' "$f"
 
       - name: Build media3ext release AAR
         run: ./gradlew :media3ext:assembleRelease --no-daemon --stacktrace
