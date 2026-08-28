@@ -1,12 +1,5 @@
 name: Build media3ext AAR (Xvid/DivX/WMV)
 
-# Собирает форк NextLib с расширенным набором FFmpeg-декодеров и выкладывает
-# готовый .aar как артефакт запуска (и, опционально, как ассет релиза).
-#
-# Куда класть: в ВАШЕМ форке anilbeesetti/nextlib — файл
-#   .github/workflows/build-aar.yml
-# Запуск: вкладка Actions → "Build media3ext AAR (Xvid/DivX/WMV)" → Run workflow.
-
 on:
   workflow_dispatch:
     inputs:
@@ -24,11 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-     - name: Checkout NextLib source at ref
-       uses: actions/checkout@v4
-       with:
-         repository: anilbeesetti/nextlib
-         ref: ${{ github.event.inputs.ref }}
+      - name: Checkout NextLib source at ref
+        uses: actions/checkout@v4
+        with:
+          repository: anilbeesetti/nextlib
+          ref: ${{ github.event.inputs.ref }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -47,23 +40,18 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "ndk;25.2.9519653" "cmake;3.22.1" "platforms;android-34" "build-tools;34.0.0"
 
-      # --- ПАТЧ: добавляем Xvid/DivX/MS-MPEG4/WMV/H263/VC1/RealVideo и др. ---
       - name: Patch enabled FFmpeg decoders + ARM-only ABIs
         run: |
           set -euxo pipefail
-          # 1) Расширяем список декодеров в сборке FFmpeg.
           sed -i 's|^ENABLED_DECODERS=.*|ENABLED_DECODERS="vorbis opus flac alac pcm_mulaw pcm_alaw mp3 amrnb amrwb aac ac3 eac3 dca mlp truehd wmav1 wmav2 wmapro h264 hevc mpeg2video mpegvideo mpeg4 msmpeg4v1 msmpeg4v2 msmpeg4v3 h263 h263p h263i vc1 wmv1 wmv2 wmv3 flv1 vp6 vp6a vp6f svq1 svq3 cinepak rv10 rv20 rv30 rv40 libvpx_vp8 libvpx_vp9"|' ffmpeg/setup.sh
-          # 2) Только ARM (реальные телефоны) — быстрее, меньше, без yasm/x86-проблем.
           sed -i 's|^ANDROID_ABIS=.*|ANDROID_ABIS="armeabi-v7a arm64-v8a"|' ffmpeg/setup.sh
-          # 3) Совпадающие abiFilters в gradle-модуле.
           sed -i 's|abiFilters += listOf("x86", "x86_64", "armeabi-v7a", "arm64-v8a")|abiFilters += listOf("armeabi-v7a", "arm64-v8a")|' media3ext/build.gradle.kts
 
-      - name: Patch MIME→decoder whitelist (add mp4v/h263/vc1)
+      - name: Patch MIME to decoder whitelist (add mp4v/h263/vc1)
         run: |
           set -euxo pipefail
           f=media3ext/src/main/java/io/github/anilbeesetti/nextlib/media3ext/ffdecoder/FfmpegLibrary.java
           perl -0777 -i -pe 's/(case MimeTypes\.VIDEO_H264 -> "h264";)/$1\n      case MimeTypes.VIDEO_MP4V -> "mpeg4";\n      case MimeTypes.VIDEO_H263 -> "h263";\n      case MimeTypes.VIDEO_VC1 -> "vc1";/' "$f"
-          echo "----- patched getCodecName -----"
           grep -n 'VIDEO_' "$f"
 
       - name: Build media3ext release AAR
